@@ -52,24 +52,26 @@ class ProductItem(BoxLayout):
 
         self.orientation = 'horizontal'
         self.size_hint_y = None
-        self.height = dp(80)
+        self.height = dp(90)
         self.padding = [dp(10), dp(5)]
-        self.spacing = dp(10)
+        self.spacing = dp(5)
 
-        # Делаем кнопки одинакового размера
+        # Кнопка удаления
         delete_btn = Button(
             text="Удалить",
-            size_hint_x=0.25,
+            size_hint_x=0.2,
             background_color=(0.8, 0, 0, 1),
-            font_size=dp(14)
+            font_size=dp(12)
         )
         delete_btn.bind(on_press=self.delete_product)
 
-        center_layout = BoxLayout(orientation='vertical', size_hint_x=0.5)
+        # Центральная часть с информацией
+        center_layout = BoxLayout(orientation='vertical', size_hint_x=0.6)
+        center_layout.padding = [dp(5), dp(5)]
 
         name_label = Label(
             text=product_name,
-            font_size=dp(18),
+            font_size=dp(16),
             halign='left',
             valign='middle',
             color=(1, 1, 1, 1),
@@ -79,10 +81,10 @@ class ProductItem(BoxLayout):
         # Информация о создателе и покупателе
         info_text = f"{category}"
         if self.is_bought:
-            info_text += f" Куплен"
+            info_text += " • Куплен"
         elif self.created_by:
             current_user = self.logic.get_current_username()
-            info_text += f" {current_user}"
+            info_text += f" • {current_user}"
 
         info_label = Label(
             text=info_text,
@@ -96,11 +98,12 @@ class ProductItem(BoxLayout):
         center_layout.add_widget(name_label)
         center_layout.add_widget(info_label)
 
+        # Кнопка купить/куплено
         self.bought_btn = Button(
             text="Куплено" if self.is_bought else "Купить",
-            size_hint_x=0.25,
+            size_hint_x=0.2,
             background_color=(0, 0.6, 0, 1) if self.is_bought else (0, 0.8, 0, 1),
-            font_size=dp(14)
+            font_size=dp(12)
         )
         self.bought_btn.bind(on_press=self.mark_bought)
 
@@ -109,15 +112,11 @@ class ProductItem(BoxLayout):
         self.add_widget(self.bought_btn)
 
     def mark_bought(self, instance):
-        print(f"Нажата кнопка купить для товара {self.product_id}")
         result = self.logic.toggle_bought(self.product_id)
-        print(f"Результат: {result}")
-        # Обновляем отображение
         self.main_screen.update_display()
 
     def delete_product(self, instance):
         result = self.logic.delete_item(self.product_id)
-        print(f"Удаление товара: {result}")
         self.main_screen.update_display()
 
 
@@ -159,7 +158,6 @@ class SuggestionItem(BoxLayout):
 
     def add_to_list(self, instance):
         result = self.logic.add_suggestion(self.product_name)
-        print(result)
         self.suggestions_screen.manager.current = 'main'
         main_screen = self.suggestions_screen.manager.get_screen('main')
         main_screen.update_display()
