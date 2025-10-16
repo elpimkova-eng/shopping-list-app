@@ -712,7 +712,7 @@ class JoinListScreen(Screen):
         if share_code:
             result = self.logic.join_shared_list(share_code)
             self.message.text = result
-            if "Успех" in result:
+            if "успешно" in result.lower():
                 self.code_input.text = ""
                 main_screen = self.manager.get_screen('main')
                 main_screen.load_user_lists()
@@ -1002,7 +1002,7 @@ class AddItemScreen(Screen):
         if product_name:
             result = self.logic.add_item(product_name, category)
             self.message.text = result
-            if "Успех" in result:
+            if "добавлен" in result.lower():
                 self.input_field.text = ""
                 # Сбрасываем категорию на "Другое"
                 self.category_btn.text = "Другое"
