@@ -36,15 +36,27 @@ class AppLogic:
             return list_id, f"Список '{list_name}' создан"
         return None, "Ошибка создания списка"
 
-    def join_shared_list(self, list_id):
+    def join_shared_list(self, share_code):
         if not self.is_logged_in():
             return "Сначала войдите в систему"
 
-        success = self.db.join_shopping_list(list_id)
+        # Очищаем код от пробелов и приводим к верхнему регистру
+        share_code = share_code.strip().upper()
+
+        if len(share_code) != 8:
+            return "Код должен содержать 8 символов"
+
+        success = self.db.join_shopping_list(share_code)
         if success:
-            self.current_list_id = list_id
-            return f"Вы присоединились к списку"
-        return "Не удалось присоединиться к списку"
+            # Находим ID списка по коду и устанавливаем как текущий
+            lists = self.db.get_user_shopping_lists()
+            for list_data in lists:
+                list_id, list_name, owner_id, owner_name, list_share_code = list_data
+                if list_share_code.upper() == share_code:
+                    self.current_list_id = list_id
+                    break
+            return "Вы успешно присоединились к списку"
+        return "Не удалось присоединиться к списку. Проверьте код."
 
     def get_user_lists(self):
         if not self.is_logged_in():
@@ -104,24 +116,24 @@ class AppLogic:
         return f"Список очищен, удалено {count} товаров"
 
     def get_purchase_history(self):
+        """Возвращает историю покупок для текущего списка"""
         if not self.is_logged_in() or not self.current_list_id:
             return []
         history = self.db.get_purchase_history(self.current_list_id)
-        print(f"История покупок из БД для списка {self.current_list_id}: {len(history)} записей")
         return history
 
     def get_smart_suggestions(self):
+        """Возвращает умные предложения для текущего списка"""
         if not self.is_logged_in() or not self.current_list_id:
             return []
         suggestions = self.db.get_smart_suggestions(self.current_list_id)
-        print(f"Умные предложения из БД для списка {self.current_list_id}: {len(suggestions)}")
         return suggestions
 
     def get_last_purchased_product(self):
+        """Возвращает последний купленный товар для текущего списка"""
         if not self.is_logged_in() or not self.current_list_id:
             return None
         last_product = self.db.get_last_purchased_product(self.current_list_id)
-        print(f"Последний купленный товар для списка {self.current_list_id}: {last_product}")
         return last_product
 
     def add_suggestion(self, product_name):
