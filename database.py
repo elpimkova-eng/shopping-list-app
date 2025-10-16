@@ -1,7 +1,6 @@
 import sqlite3
 from datetime import datetime
 import hashlib
-import os
 import uuid
 
 
@@ -26,6 +25,7 @@ class Database:
         try:
             cursor = conn.cursor()
 
+            # Таблица пользователей
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -35,6 +35,7 @@ class Database:
                 )
             ''')
 
+            # Таблица списков покупок
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS shopping_lists (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +47,7 @@ class Database:
                 )
             ''')
 
+            # Таблица участников списков
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS list_members (
                     list_id INTEGER NOT NULL,
@@ -57,6 +59,7 @@ class Database:
                 )
             ''')
 
+            # Таблица товаров
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS shopping_items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,6 +77,7 @@ class Database:
                 )
             ''')
 
+            # Таблица истории покупок
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS purchase_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,10 +92,10 @@ class Database:
             ''')
 
             conn.commit()
-            print("БД инициализирована")
+            print("База данных инициализирована")
             return True
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"Ошибка инициализации БД: {e}")
             return False
         finally:
             conn.close()
@@ -112,10 +116,10 @@ class Database:
                 (username, password_hash)
             )
             conn.commit()
-            print(f"Зарегистрирован пользователь: {username}")
+            print(f"Пользователь {username} зарегистрирован")
             return True
         except sqlite3.IntegrityError:
-            print("Пользователь с таким именем уже существует")
+            print("Пользователь уже существует")
             return False
         except Exception as e:
             print(f"Ошибка регистрации: {e}")
@@ -140,21 +144,21 @@ class Database:
             if result:
                 self.current_user_id = result[0]
                 self.current_username = result[1]
-                print(f"Вошел пользователь: {username} (ID: {self.current_user_id})")
+                print(f"Пользователь {username} вошел в систему")
                 return True
             else:
-                print("Неверное имя пользователя или пароль")
+                print("Неверные учетные данные")
                 return False
         except Exception as e:
-            print(f"Ошибка авторизации: {e}")
+            print(f"Ошибка входа: {e}")
             return False
         finally:
             conn.close()
 
     def logout_user(self):
+        print(f"Пользователь {self.current_username} вышел из системы")
         self.current_user_id = None
         self.current_username = None
-        print("Пользователь вышел из системы")
 
     def get_current_user_id(self):
         return self.current_user_id
@@ -174,7 +178,7 @@ class Database:
 
         try:
             cursor = conn.cursor()
-            share_code = str(uuid.uuid4())[:8]
+            share_code = str(uuid.uuid4())[:8].upper()
 
             cursor.execute(
                 "INSERT INTO shopping_lists (name, owner_id, share_code) VALUES (?, ?, ?)",
@@ -188,7 +192,7 @@ class Database:
             )
 
             conn.commit()
-            print(f"Создан список: '{list_name}' (ID: {list_id})")
+            print(f"Создан список '{list_name}' с кодом {share_code}")
             return list_id
         except Exception as e:
             print(f"Ошибка создания списка: {e}")
@@ -206,7 +210,8 @@ class Database:
         try:
             cursor = conn.cursor()
 
-            cursor.execute("SELECT id FROM shopping_lists WHERE share_code = ?", (share_code,))
+            # Находим список по коду (без учета регистра)
+            cursor.execute("SELECT id FROM shopping_lists WHERE UPPER(share_code) = ?", (share_code.upper(),))
             result = cursor.fetchone()
 
             if not result:
@@ -215,6 +220,7 @@ class Database:
 
             list_id = result[0]
 
+            # Проверяем, не является ли пользователь уже участником
             cursor.execute(
                 "SELECT 1 FROM list_members WHERE list_id = ? AND user_id = ?",
                 (list_id, self.current_user_id)
@@ -223,6 +229,7 @@ class Database:
                 print("Вы уже участник этого списка")
                 return False
 
+            # Добавляем пользователя как участника
             cursor.execute(
                 "INSERT INTO list_members (list_id, user_id) VALUES (?, ?)",
                 (list_id, self.current_user_id)
@@ -256,7 +263,7 @@ class Database:
             ''', (self.current_user_id,))
 
             lists = cursor.fetchall()
-            print(f"Найдено списков: {len(lists)}")
+            print(f"Найдено {len(lists)} списков для пользователя")
             return lists
         except Exception as e:
             print(f"Ошибка получения списков: {e}")
@@ -294,6 +301,7 @@ class Database:
         try:
             cursor = conn.cursor()
 
+            # Проверяем, является ли пользователь владельцем
             cursor.execute("SELECT owner_id FROM shopping_lists WHERE id = ?", (list_id,))
             result = cursor.fetchone()
 
@@ -301,6 +309,7 @@ class Database:
                 print("Только владелец может удалить список")
                 return False
 
+            # Удаляем все связанные данные
             cursor.execute("DELETE FROM shopping_items WHERE list_id = ?", (list_id,))
             cursor.execute("DELETE FROM purchase_history WHERE list_id = ?", (list_id,))
             cursor.execute("DELETE FROM list_members WHERE list_id = ?", (list_id,))
@@ -328,7 +337,9 @@ class Database:
                 WHERE lm.list_id = ?
             ''', (list_id,))
 
-            return [row[0] for row in cursor.fetchall()]
+            members = [row[0] for row in cursor.fetchall()]
+            print(f"Найдено {len(members)} участников списка {list_id}")
+            return members
         except Exception as e:
             print(f"Ошибка получения участников: {e}")
             return []
@@ -353,10 +364,10 @@ class Database:
                 (list_id, product_name, category, max_order + 1, self.current_user_id)
             )
             conn.commit()
-            print(f"ДОБАВЛЕНО: '{product_name}' в список {list_id}")
+            print(f"Добавлен товар '{product_name}' в список {list_id}")
             return True
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"Ошибка добавления товара: {e}")
             return False
         finally:
             conn.close()
@@ -378,10 +389,10 @@ class Database:
                 ORDER BY sort_order
             ''', (list_id,))
             products = cursor.fetchall()
-            print(f"Товаров в списке {list_id}: {len(products)}")
+            print(f"Найдено {len(products)} товаров в списке {list_id}")
             return products
         except Exception as e:
-            print(f"Ошибка получения списка: {e}")
+            print(f"Ошибка получения списка товаров: {e}")
             return []
         finally:
             conn.close()
@@ -397,6 +408,7 @@ class Database:
         try:
             cursor = conn.cursor()
 
+            # Получаем текущий статус товара
             cursor.execute("SELECT list_id, product_name, category, bought_by FROM shopping_items WHERE id = ?",
                            (product_id,))
             product = cursor.fetchone()
@@ -407,25 +419,29 @@ class Database:
 
             list_id, product_name, category, current_bought_by = product
 
+            # Получаем текущее время в правильном формате
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
             if current_bought_by is None:
+                # Отмечаем как купленный с явным указанием времени
                 cursor.execute(
                     "UPDATE shopping_items SET bought_by = ?, bought_date = ? WHERE id = ?",
                     (self.current_user_id, current_time, product_id)
                 )
 
+                # Добавляем в историю покупок с явным указанием времени
                 cursor.execute(
                     "INSERT INTO purchase_history (list_id, product_name, category, bought_by, bought_date) VALUES (?, ?, ?, ?, ?)",
                     (list_id, product_name, category, self.current_user_id, current_time)
                 )
-                print(f"КУПЛЕНО: '{product_name}' пользователем {self.current_user_id} в {current_time}")
+                print(f"Товар '{product_name}' отмечен как купленный")
             else:
+                # Отменяем покупку
                 cursor.execute(
                     "UPDATE shopping_items SET bought_by = NULL, bought_date = NULL WHERE id = ?",
                     (product_id,)
                 )
-                print(f"ОТМЕНЕНО: '{product_name}'")
+                print(f"Статус покупки товара '{product_name}' отменен")
 
             conn.commit()
             return True
@@ -447,10 +463,10 @@ class Database:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM shopping_items WHERE id = ?", (product_id,))
             conn.commit()
-            print(f"УДАЛЕНО: товар ID {product_id}")
+            print(f"Товар {product_id} удален")
             return True
         except Exception as e:
-            print(f"Ошибка: {e}")
+            print(f"Ошибка удаления товара: {e}")
             return False
         finally:
             conn.close()
@@ -468,7 +484,7 @@ class Database:
             count = cursor.fetchone()[0]
             cursor.execute("DELETE FROM shopping_items WHERE list_id = ? AND bought_by IS NULL", (list_id,))
             conn.commit()
-            print(f"СПИСОК ОЧИЩЕН: удалено {count} товаров из списка {list_id}")
+            print(f"Список {list_id} очищен, удалено {count} товаров")
             return count
         except Exception as e:
             print(f"Ошибка очистки списка: {e}")
@@ -493,7 +509,7 @@ class Database:
                 ORDER BY ph.bought_date DESC
             ''', (list_id,))
             history = cursor.fetchall()
-            print(f"Записей в истории покупок списка {list_id}: {len(history)}")
+            print(f"Найдено {len(history)} записей в истории покупок")
             return history
         except Exception as e:
             print(f"Ошибка получения истории: {e}")
@@ -519,7 +535,7 @@ class Database:
                 LIMIT 5
             ''', (list_id,))
             suggestions = cursor.fetchall()
-            print(f"Найдено предложений для списка {list_id}: {len(suggestions)}")
+            print(f"Найдено {len(suggestions)} предложений")
             return suggestions
         except Exception as e:
             print(f"Ошибка получения предложений: {e}")
@@ -566,15 +582,18 @@ class Database:
         try:
             cursor = conn.cursor()
 
+            # Удаляем пользователя из участников
             cursor.execute(
                 "DELETE FROM list_members WHERE list_id = ? AND user_id = ?",
                 (list_id, self.current_user_id)
             )
 
+            # Если пользователь был владельцем, передаем владение другому участнику
             cursor.execute("SELECT owner_id FROM shopping_lists WHERE id = ?", (list_id,))
             owner_id = cursor.fetchone()[0]
 
             if owner_id == self.current_user_id:
+                # Находим другого участника
                 cursor.execute(
                     "SELECT user_id FROM list_members WHERE list_id = ? AND user_id != ? LIMIT 1",
                     (list_id, self.current_user_id)
@@ -588,6 +607,7 @@ class Database:
                     )
                     print(f"Владелец списка {list_id} изменен на {new_owner[0]}")
                 else:
+                    # Если участников больше нет, удаляем список
                     cursor.execute("DELETE FROM shopping_lists WHERE id = ?", (list_id,))
                     print(f"Список {list_id} удален (нет участников)")
 
